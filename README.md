@@ -1,4 +1,4 @@
-# SmartSurveil
+# Surveilance_AI
 AI security system using MediaPipe pose detection and OpenCV.
 
 ## Run
