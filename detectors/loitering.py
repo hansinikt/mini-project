@@ -9,9 +9,12 @@
 #    the restricted zone. Tracks hip position over 60 frames.
 
 import time
-from config import (RESTRICTED_ZONE, FRAME_W, FRAME_H,
-                    LOITER_HISTORY_LEN, LOITER_MOVEMENT_LIMIT,
-                    ZONE_ENTRY_GRACE)
+from config import RESTRICTED_ZONE, FRAME_W, FRAME_H
+
+# Tuning constants
+LOITER_HISTORY_LEN    = 60     # frames to track
+LOITER_MOVEMENT_LIMIT = 0.015  # max hip movement to count as loitering
+ZONE_ENTRY_GRACE      = 2.0    # seconds before time-in-zone counts
 
 
 def make_loiter_state() -> dict:
