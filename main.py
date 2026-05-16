@@ -20,7 +20,9 @@ from detectors.trespassing import check_trespassing
 from detectors.climbing    import check_climbing
 from detectors.lockpicking import check_lockpicking, make_lock_state
 
-from hud.drawing import draw_corner_rect, draw_hud_text, draw_alert_banner, draw_landmark_custom
+from hud.drawing import (draw_corner_rect, draw_hud_text,
+                         draw_alert_banner, draw_landmark_custom,
+                         draw_tracking_box)
 from hud.bars    import draw_top_bar, draw_bottom_bar
 from hud.panel   import draw_side_panel
 
@@ -48,6 +50,13 @@ mp_options = PoseLandmarkerOptions(
 # ─── Per-session state ────────────────────────────────────────────
 climb_history = []
 lock_state    = make_lock_state()
+
+# Tracking state — once a detection fires the person is tracked
+# until they leave the frame. "intrusion" takes priority over "lock"
+tracking = {
+    "active":  False,   # is tracking currently on
+    "reason":  None,    # "intrusion" or "lock"
+}
 
 # ─── Camera ───────────────────────────────────────────────────────
 cap = cv2.VideoCapture(0)
@@ -120,6 +129,32 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
             if fired:
                 alerts["lock"] = True
                 alert_banners.append(("!! LOCKPICKING ALERT !!", (0, 40, 140)))
+
+            # ── Tracking ─────────────────────────────────────────
+            # Activate tracking when intrusion or lockpick fires
+            # Intrusion takes priority over lock
+            if alerts["intrusion"]:
+                tracking["active"] = True
+                tracking["reason"] = "intrusion"
+            elif alerts["lock"] and not tracking["active"]:
+                tracking["active"] = True
+                tracking["reason"] = "lock"
+
+            # Draw tracking box if active
+            if tracking["active"]:
+                if tracking["reason"] == "intrusion":
+                    draw_tracking_box(frame, lm,
+                                      color=(0, 60, 255),
+                                      label="TRACKING: INTRUDER")
+                else:
+                    draw_tracking_box(frame, lm,
+                                      color=(255, 220, 0),
+                                      label="TRACKING: SUSPECT")
+
+        else:
+            # Person left the frame — reset tracking
+            tracking["active"] = False
+            tracking["reason"] = None
 
         # ── Draw HUD ──────────────────────────────────────────────
         draw_top_bar(frame,    any(alerts.values()))
