@@ -12,10 +12,10 @@ PANEL_W   = 280
 
 # ── Detection zones ──────────────────────────────────────────────
 RESTRICTED_ZONE = (60, TOP_BAR_H + 20, 350, FRAME_H - BOT_BAR_H - 180)
-LOCK_ZONE       = (620, TOP_BAR_H + 60, 820, FRAME_H - BOT_BAR_H - 60)
+LOCK_ZONE       = (550, TOP_BAR_H + 60, 900, FRAME_H - BOT_BAR_H - 60)
 
 # ── Timing ───────────────────────────────────────────────────────
-LOCK_DWELL_TIME  = 1.5   # seconds hand must be in zone before timer starts
+LOCK_DWELL_TIME  = 1.0   # seconds hand must be in zone before timer starts
 LOCK_ALERT_TIME  = 5.0   # seconds of continuous presence to trigger alert
 
 # ── Climbing ─────────────────────────────────────────────────────

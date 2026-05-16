@@ -17,9 +17,9 @@ from config import (LOCK_ZONE, LOCK_DWELL_TIME, LOCK_ALERT_TIME,
                     FRAME_W, FRAME_H)
 
 # ── Tuning constants ──────────────────────────────────────────────
-CROUCH_THRESHOLD  = 0.55   # hips must be below this fraction of frame height
+CROUCH_THRESHOLD  = 0.35   # hips must be below this fraction of frame height
 STATIONARY_FRAMES = 30     # how many frames to track for movement
-STATIONARY_LIMIT  = 0.012  # max hip movement allowed (fraction of frame height)
+STATIONARY_LIMIT  = 0.025  # max hip movement allowed (fraction of frame height)
 ZONE_MARGIN       = 80     # pixels outside zone that still count as "near door"
 
 
@@ -68,8 +68,9 @@ def check_lockpicking(lm, state: dict) -> tuple:
     else:
         stationary = False
 
-    # ── All 3 must be true ───────────────────────────────────────
-    all_conditions = near_door and crouching and stationary
+    # ── 2 out of 3 must be true ───────────────────────────────────
+    score = sum([near_door, crouching, stationary])
+    all_conditions = score >= 2
 
     if not all_conditions:
         state["dwell_start"] = None
