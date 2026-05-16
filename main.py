@@ -6,15 +6,17 @@
 #   - The frame loop
 #   - Calling each detector and passing results to the HUD
 #
-# All logic lives in detectors/ and hud/
+# All logic lives in detectors/, hud/, and alerts/
 
 import cv2
 import mediapipe as mp
 import urllib.request
 import os
+import threading
 
 from config import (FRAME_W, FRAME_H, TOP_BAR_H,
-                    RESTRICTED_ZONE, LOCK_ZONE, C_YELLOW, C_CYAN)
+                    RESTRICTED_ZONE, LOCK_ZONE, C_YELLOW, C_CYAN,
+                    C_WHITE, C_RED, C_GREEN, C_GRAY, C_ORANGE)
 
 from detectors.trespassing import check_trespassing
 from detectors.climbing    import check_climbing
@@ -25,6 +27,9 @@ from hud.drawing import (draw_corner_rect, draw_hud_text,
                          draw_tracking_box)
 from hud.bars    import draw_top_bar, draw_bottom_bar
 from hud.panel   import draw_side_panel
+
+from alerts.suspicion  import make_suspicion_state, update_score, reset_score
+from alerts.email_alert import send_alert_email
 
 # ─── Model download ───────────────────────────────────────────────
 MODEL_PATH = "pose_landmarker.task"
@@ -48,13 +53,39 @@ mp_options = PoseLandmarkerOptions(
     running_mode=VisionRunningMode.IMAGE)
 
 # ─── Per-session state ────────────────────────────────────────────
-climb_history = []
-lock_state    = make_lock_state()
+climb_history    = []
+lock_state       = make_lock_state()
+suspicion_state  = make_suspicion_state()
 
 # ─── Camera ───────────────────────────────────────────────────────
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_W)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_H)
+
+def _draw_score_bar(frame, score, threshold=100):
+    """Draw suspicion score bar in bottom-left of frame."""
+    bar_x  = 18
+    bar_y  = FRAME_H - 90
+    bar_w  = 200
+    bar_h  = 12
+    progress = min(score / threshold, 1.0)
+
+    # Color shifts red as score rises
+    if progress > 0.7:
+        bar_color = C_RED
+    elif progress > 0.4:
+        bar_color = C_ORANGE
+    else:
+        bar_color = C_GREEN
+
+    draw_hud_text(frame, "SUSPICION", bar_x, bar_y - 6, C_GRAY, scale=0.42)
+    cv2.rectangle(frame, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h), (40,40,40), -1)
+    cv2.rectangle(frame, (bar_x, bar_y),
+                  (bar_x + int(bar_w * progress), bar_y + bar_h), bar_color, -1)
+    draw_hud_text(frame, f"{score:.0f} / {threshold}",
+                  bar_x, bar_y + bar_h + 16, bar_color, scale=0.42)
+    draw_hud_text(frame, "R = RESET SCORE",
+                  bar_x, bar_y + bar_h + 34, C_GRAY, scale=0.38)
 
 # ─── Main loop ────────────────────────────────────────────────────
 with PoseLandmarker.create_from_options(mp_options) as landmarker:
@@ -133,17 +164,43 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
                                   color=(255, 220, 0),
                                   label="TRACKING: SUSPECT")
 
+        # ── Suspicion score ───────────────────────────────────────
+        score, threshold_crossed = update_score(suspicion_state, alerts)
+
+        if threshold_crossed:
+            # Build trigger list for email
+            triggers = []
+            if alerts["intrusion"]: triggers.append("Person in restricted zone")
+            if alerts["lock"]:      triggers.append("Lockpicking behavior detected")
+            if alerts["climb"]:     triggers.append("Climbing detected")
+
+            # Send email in background so it doesn't freeze the camera
+            threading.Thread(
+                target=send_alert_email,
+                args=(triggers, score),
+                daemon=True
+            ).start()
+
+            alert_banners.append(("!! SUSPICION THRESHOLD REACHED — ALERT SENT !!",
+                                   (0, 0, 140)))
+
         # ── Draw HUD ──────────────────────────────────────────────
         draw_top_bar(frame,    any(alerts.values()))
         draw_bottom_bar(frame, person_detected)
         draw_side_panel(frame, alerts, lock_info, climb_subs)
+        _draw_score_bar(frame, score)
 
         for i, (msg, color) in enumerate(alert_banners):
             draw_alert_banner(frame, msg, TOP_BAR_H + i * 64, color)
 
         cv2.imshow("AI Security System", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
+        elif key == ord('r'):
+            reset_score(suspicion_state)
+            print("[SCORE] Suspicion score reset.")
 
 cap.release()
 cv2.destroyAllWindows()

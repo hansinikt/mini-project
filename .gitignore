@@ -6,3 +6,4 @@ venv/
 *.pt
 .vscode/
 .DS_Store
+.env
