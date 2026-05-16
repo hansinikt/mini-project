@@ -51,13 +51,6 @@ mp_options = PoseLandmarkerOptions(
 climb_history = []
 lock_state    = make_lock_state()
 
-# Tracking state — once a detection fires the person is tracked
-# until they leave the frame. "intrusion" takes priority over "lock"
-tracking = {
-    "active":  False,   # is tracking currently on
-    "reason":  None,    # "intrusion" or "lock"
-}
-
 # ─── Camera ───────────────────────────────────────────────────────
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH,  FRAME_W)
@@ -131,30 +124,14 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
                 alert_banners.append(("!! LOCKPICKING ALERT !!", (0, 40, 140)))
 
             # ── Tracking ─────────────────────────────────────────
-            # Activate tracking when intrusion or lockpick fires
-            # Intrusion takes priority over lock
             if alerts["intrusion"]:
-                tracking["active"] = True
-                tracking["reason"] = "intrusion"
-            elif alerts["lock"] and not tracking["active"]:
-                tracking["active"] = True
-                tracking["reason"] = "lock"
-
-            # Draw tracking box if active
-            if tracking["active"]:
-                if tracking["reason"] == "intrusion":
-                    draw_tracking_box(frame, lm,
-                                      color=(0, 60, 255),
-                                      label="TRACKING: INTRUDER")
-                else:
-                    draw_tracking_box(frame, lm,
-                                      color=(255, 220, 0),
-                                      label="TRACKING: SUSPECT")
-
-        else:
-            # Person left the frame — reset tracking
-            tracking["active"] = False
-            tracking["reason"] = None
+                draw_tracking_box(frame, lm,
+                                  color=(0, 60, 255),
+                                  label="TRACKING: INTRUDER")
+            if alerts["lock"]:
+                draw_tracking_box(frame, lm,
+                                  color=(255, 220, 0),
+                                  label="TRACKING: SUSPECT")
 
         # ── Draw HUD ──────────────────────────────────────────────
         draw_top_bar(frame,    any(alerts.values()))
