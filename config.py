@@ -32,3 +32,18 @@ C_WHITE  = (230, 230, 230)
 C_GRAY   = (130, 130, 130)
 C_DARK   = (15,  15,  15)
 C_ORANGE = (0,   140, 255)
+
+# ── Loitering detection ───────────────────────────────────────────
+LOITER_HISTORY_LEN    = 60     # frames to track for loitering
+LOITER_MOVEMENT_LIMIT = 0.015  # max hip movement to count as loitering
+ZONE_ENTRY_GRACE      = 2.0    # seconds before time-in-zone score starts
+
+# ── Suspicion score ───────────────────────────────────────────────
+SUSPICION_THRESHOLD    = 100   # score needed to fire alert
+SCORE_TRESPASSING      = 2     # points per frame for trespassing
+SCORE_TIME_IN_ZONE     = 1     # bonus points per frame after grace period
+SCORE_LOITERING        = 2     # bonus points per frame for loitering
+SCORE_LOCKPICKING      = 2     # points per frame for lockpicking
+SCORE_CLIMBING         = 1     # points per frame for climbing
+SCORE_DECAY_PER_FRAME  = 1     # points lost per frame when nothing detected
+EMAIL_COOLDOWN         = 300   # seconds between alert emails (5 minutes)

@@ -1,73 +1,78 @@
 # ─── alerts/suspicion.py ─────────────────────────────────────────
 # Tracks a suspicion score across frames.
 #
-# Each detector contributes points when active:
-#   Trespassing  = 40 pts  (highest — being in restricted zone is serious)
-#   Lockpicking  = 40 pts  (high — stationary near door is very suspicious)
-#   Climbing     = 25 pts  (medium — could be accidental)
+# Score sources per frame:
+#   Trespassing              = 2 pts
+#   + Time in zone bonus     = 1 pt  (after 2s grace period)
+#   + Loitering bonus        = 2 pts (barely moving in zone)
+#   Lockpicking              = 2 pts
+#   Climbing                 = 1 pt
+#   Decay per frame          = -1 pt (when nothing active)
 #
-# Score decays slowly every frame so it doesn't stay permanently high.
-# When score crosses SUSPICION_THRESHOLD → alert fires.
-# Score resets manually via reset().
+# At ~30fps, trespassing + loitering hits 100 in ~10 seconds.
+# Only ONE email is sent per session — resets when user presses R.
 
-import time
 from config import (SUSPICION_THRESHOLD, SCORE_TRESPASSING,
+                    SCORE_TIME_IN_ZONE, SCORE_LOITERING,
                     SCORE_LOCKPICKING, SCORE_CLIMBING,
-                    SCORE_DECAY_PER_FRAME)
+                    SCORE_DECAY_PER_FRAME, ZONE_ENTRY_GRACE)
 
 
 def make_suspicion_state() -> dict:
     """Call once at startup."""
     return {
-        "score":          0.0,
-        "alert_fired":    False,   # True once threshold crossed
-        "last_alert_time": 0.0,    # timestamp of last alert
+        "score":       0.0,
+        "email_sent":  False,   # only send one email per session
     }
 
 
-def update_score(state: dict, alerts: dict) -> tuple:
+def update_score(state: dict, alerts: dict,
+                 time_in_zone: float, is_loitering: bool) -> tuple:
     """
-    Call every frame with the current alert flags.
+    Call every frame.
 
     Parameters
     ----------
-    state  : dict from make_suspicion_state(), mutated in place
-    alerts : {"intrusion": bool, "climb": bool, "lock": bool}
+    state        : dict from make_suspicion_state()
+    alerts       : {"intrusion": bool, "climb": bool, "lock": bool}
+    time_in_zone : seconds person has been in restricted zone
+    is_loitering : bool from loitering detector
 
     Returns
     -------
     (score, threshold_crossed)
-      score             — current score (0 to SUSPICION_THRESHOLD+)
-      threshold_crossed — True if score just crossed the threshold
-                          AND cooldown has passed
     """
     # Add points for active detections
     if alerts.get("intrusion", False):
         state["score"] += SCORE_TRESPASSING
+        if time_in_zone > ZONE_ENTRY_GRACE:
+            state["score"] += SCORE_TIME_IN_ZONE
+        if is_loitering:
+            state["score"] += SCORE_LOITERING
+
     if alerts.get("lock", False):
         state["score"] += SCORE_LOCKPICKING
+
     if alerts.get("climb", False):
         state["score"] += SCORE_CLIMBING
 
-    # Decay score slowly each frame
-    state["score"] = max(0.0, state["score"] - SCORE_DECAY_PER_FRAME)
+    # Decay when nothing is active
+    if not any(alerts.values()):
+        state["score"] = max(0.0, state["score"] - SCORE_DECAY_PER_FRAME)
 
-    # Cap at 2x threshold so it doesn't balloon
+    # Cap at 2x threshold
     state["score"] = min(state["score"], SUSPICION_THRESHOLD * 2)
 
-    # Check if threshold crossed and cooldown passed
+    # Only fire once per session
     threshold_crossed = False
-    if state["score"] >= SUSPICION_THRESHOLD:
-        now = time.time()
-        if not state["alert_fired"] or (now - state["last_alert_time"]) > 300:
-            threshold_crossed    = True
-            state["alert_fired"] = True
-            state["last_alert_time"] = now
+    if state["score"] >= SUSPICION_THRESHOLD and not state["email_sent"]:
+        threshold_crossed  = True
+        state["email_sent"] = True
 
     return state["score"], threshold_crossed
 
 
 def reset_score(state: dict):
-    """Reset score and alert flag — call when user resets via email reply."""
-    state["score"]       = 0.0
-    state["alert_fired"] = False
+    """Reset score and allow email to be sent again."""
+    state["score"]      = 0.0
+    state["email_sent"] = False

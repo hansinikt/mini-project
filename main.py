@@ -21,6 +21,7 @@ from config import (FRAME_W, FRAME_H, TOP_BAR_H,
 from detectors.trespassing import check_trespassing
 from detectors.climbing    import check_climbing
 from detectors.lockpicking import check_lockpicking, make_lock_state
+from detectors.loitering   import check_loitering, make_loiter_state
 
 from hud.drawing import (draw_corner_rect, draw_hud_text,
                          draw_alert_banner, draw_landmark_custom,
@@ -55,6 +56,7 @@ mp_options = PoseLandmarkerOptions(
 # ─── Per-session state ────────────────────────────────────────────
 climb_history    = []
 lock_state       = make_lock_state()
+loiter_state     = make_loiter_state()
 suspicion_state  = make_suspicion_state()
 
 # ─── Camera ───────────────────────────────────────────────────────
@@ -164,8 +166,16 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
                                   color=(255, 220, 0),
                                   label="TRACKING: SUSPECT")
 
+            # 4. Loitering
+            time_in_zone, is_loitering = check_loitering(lm, loiter_state)
+
+        else:
+            time_in_zone = 0.0
+            is_loitering = False
+
         # ── Suspicion score ───────────────────────────────────────
-        score, threshold_crossed = update_score(suspicion_state, alerts)
+        score, threshold_crossed = update_score(
+            suspicion_state, alerts, time_in_zone, is_loitering)
 
         if threshold_crossed:
             # Build trigger list for email
