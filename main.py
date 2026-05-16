@@ -29,7 +29,7 @@ from hud.drawing import (draw_corner_rect, draw_hud_text,
 from hud.bars    import draw_top_bar, draw_bottom_bar
 from hud.panel   import draw_side_panel
 
-from alerts.suspicion  import make_suspicion_state, update_score, reset_score
+from alerts.suspicion   import make_suspicion_state, update_suspicion, reset_suspicion
 from alerts.email_alert import send_alert_email
 
 # ─── Model download ───────────────────────────────────────────────
@@ -173,21 +173,18 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
             time_in_zone = 0.0
             is_loitering = False
 
-        # ── Suspicion score ───────────────────────────────────────
-        score, threshold_crossed = update_score(
-            suspicion_state, alerts, time_in_zone, is_loitering)
+        # ── Suspicion bar ─────────────────────────────────────────
+        bar_value, email_should_fire = update_suspicion(suspicion_state, alerts)
 
-        if threshold_crossed:
-            # Build trigger list for email
+        if email_should_fire:
             triggers = []
             if alerts["intrusion"]: triggers.append("Person in restricted zone")
             if alerts["lock"]:      triggers.append("Lockpicking behavior detected")
             if alerts["climb"]:     triggers.append("Climbing detected")
 
-            # Send email in background so it doesn't freeze the camera
             threading.Thread(
                 target=send_alert_email,
-                args=(triggers, score),
+                args=(triggers, bar_value * 100),
                 daemon=True
             ).start()
 
@@ -198,7 +195,7 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
         draw_top_bar(frame,    any(alerts.values()))
         draw_bottom_bar(frame, person_detected)
         draw_side_panel(frame, alerts, lock_info, climb_subs)
-        _draw_score_bar(frame, score)
+        _draw_score_bar(frame, bar_value * 100)
 
         for i, (msg, color) in enumerate(alert_banners):
             draw_alert_banner(frame, msg, TOP_BAR_H + i * 64, color)
@@ -209,8 +206,8 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
         if key == ord('q'):
             break
         elif key == ord('r'):
-            reset_score(suspicion_state)
-            print("[SCORE] Suspicion score reset.")
+            reset_suspicion(suspicion_state)
+            print("[SCORE] Suspicion bar reset.")
 
 cap.release()
 cv2.destroyAllWindows()
