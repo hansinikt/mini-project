@@ -35,10 +35,10 @@ C_ORANGE = (0,   140, 255)
 
 # ── Suspicion bar ─────────────────────────────────────────────────
 # Bar goes from 0.0 to 1.0. Rates are per frame at ~30fps.
-# 2+ detectors: 1/(3s × 30fps)  = 0.0111 per frame → full in 3 seconds
+# 2+ detectors: 1/(10s × 30fps) = 0.0033 per frame → full in 10 seconds
 # 1 detector:   1/(30s × 30fps) = 0.0011 per frame → full in 30 seconds
 # Decay:        1/(10s × 30fps) = 0.0033 per frame → empty in 10 seconds
-SUSPICION_FAST_RATE  = 0.0111   # 2+ detectors active
-SUSPICION_SLOW_RATE  = 0.0011   # 1 detector active
-SUSPICION_DECAY_RATE = 0.0033   # no detectors active
+SUSPICION_FAST_RATE  = 0.0033   # 2+ detectors active — fills in ~10 seconds
+SUSPICION_SLOW_RATE  = 0.0011   # 1 detector active — fills in ~30 seconds
+SUSPICION_DECAY_RATE = 0.0033   # no person in frame — empties in ~10 seconds
 EMAIL_COOLDOWN       = 300      # seconds between alert emails (5 minutes)

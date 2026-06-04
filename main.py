@@ -174,9 +174,10 @@ with PoseLandmarker.create_from_options(mp_options) as landmarker:
             is_loitering = False
 
         # ── Suspicion bar ─────────────────────────────────────────
-        bar_value, email_should_fire = update_suspicion(suspicion_state, alerts)
+        bar_value, alert_should_fire = update_suspicion(
+            suspicion_state, alerts, person_detected)
 
-        if email_should_fire:
+        if alert_should_fire:
             triggers = []
             if alerts["intrusion"]: triggers.append("Person in restricted zone")
             if alerts["lock"]:      triggers.append("Lockpicking behavior detected")
